@@ -4,8 +4,8 @@ const http = require('http');
 const io = require('socket.io');
 const cors = require('cors');
 
-const FETCH_INTERVAL = 5000;
 const PORT = process.env.PORT || 4000;
+// let FETCH_INTERVAL = 5000;
 
 const tickers = [
   'AAPL', // Apple
@@ -23,11 +23,17 @@ function randomValue(min = 0, max = 1, precision = 0) {
 
 function utcDate() {
   const now = new Date();
-  return new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
+  return new Date(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds()
+  );
 }
 
 function getQuotes(socket) {
-
   const quotes = tickers.map(ticker => ({
     ticker,
     exchange: 'NASDAQ',
@@ -39,19 +45,19 @@ function getQuotes(socket) {
     last_trade_time: utcDate(),
   }));
 
-  socket.emit('ticker', quotes);
+  socket.volatile.emit('ticker', quotes);
 }
 
-function trackTickers(socket) {
+function trackTickers(socket, interval) {
   // run the first time immediately
   getQuotes(socket);
 
   // every N seconds
-  const timer = setInterval(function() {
+  const timer = setInterval(function () {
     getQuotes(socket);
-  }, FETCH_INTERVAL);
+  }, interval);
 
-  socket.on('disconnect', function() {
+  socket.on('disconnect', function () {
     clearInterval(timer);
   });
 }
@@ -62,17 +68,20 @@ const server = http.createServer(app);
 
 const socketServer = io(server, {
   cors: {
-    origin: "*",
-  }
+    origin: '*',
+  },
 });
 
-app.get('/', function(req, res) {
+app.get('/', function (req, res) {
   res.sendFile(__dirname + '/index.html');
 });
 
-socketServer.on('connection', (socket) => {
-  socket.on('start', () => {
-    trackTickers(socket);
+socketServer.on('connection', socket => {
+  socket.on('start', interval => {
+    trackTickers(socket, interval);
+  });
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
   });
 });
 
